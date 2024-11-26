@@ -153,6 +153,121 @@ router.get("/test", async (req, res) => {
 });
 
 // Get products with pagination
+// router.get("/", async (req, res) => {
+//   let {
+//     _page = 1,
+//     _limit = 5,
+//     product_name_like,
+//     type_id,
+//     color_id,
+//   } = req.query;
+//   const page = parseInt(_page, 10) || 1;
+//   const limit = parseInt(_limit, 10) || 5;
+//   const offset = (page - 1) * limit;
+
+//   if (page < 1 || limit < 1) {
+//     return res
+//       .status(400)
+//       .json({ error: "Page and limit must be greater than 0" });
+//   }
+
+//   let whereClauses = [];
+//   let params = [];
+
+//   if (product_name_like) {
+//     whereClauses.push("p.product_name LIKE ?");
+//     params.push(`%${product_name_like}%`);
+//   }
+
+//   if (type_id) {
+//     whereClauses.push("p.type_id = ?");
+//     params.push(type_id);
+//   }
+
+//   if (color_id) {
+//     whereClauses.push("p.color_id = ?");
+//     params.push(color_id);
+//   }
+
+//   const whereClause =
+//     whereClauses.length > 0 ? `WHERE ${whereClauses.join(" AND ")}` : "";
+
+//   try {
+//     const results = await executeQuery(
+//       `SELECT p.product_id, p.product_name, p.type_id, p.color_id, p.size,p.category_id, p.mo_number, pr.price, ph.photo
+//    FROM (
+//      SELECT DISTINCT p.id AS product_id, p.product_name, p.type_id, p.color_id,p.category_id,  p.size, p.mo_number
+//      FROM product p
+//      LEFT JOIN price pr ON p.id = pr.product_id
+//      ${whereClause}
+//      ORDER BY p.created_at DESC
+//      LIMIT ? OFFSET ?
+//    ) AS p
+//    LEFT JOIN photo ph ON p.product_id = ph.product_id
+//    LEFT JOIN price pr ON p.product_id = pr.product_id`,
+
+//       [...params, limit, offset]
+//     );
+
+//     const totalCount = await executeQuery(
+//       `SELECT COUNT(DISTINCT p.id) AS count
+//        FROM product p
+//        ${whereClause}`,
+//       [...params]
+//     );
+
+//     if (results.length === 0) {
+//       return res
+//         .status(404)
+//         .json({ message: "No products found matching the criteria" });
+//     }
+
+//     const products = results.reduce((acc, row) => {
+//       const {
+//         product_id,
+//         product_name,
+//         type_id,
+//         color_id,
+//         category_id,
+//         size,
+//         mo_number,
+//         price,
+//         photo,
+//       } = row;
+
+//       if (!acc[product_id]) {
+//         acc[product_id] = {
+//           id: product_id,
+//           product_name,
+//           type_id,
+//           color_id,
+//           category_id,
+//           size,
+//           mo_number,
+//           price,
+//           photos: [],
+//         };
+//       }
+
+//       if (photo) {
+//         acc[product_id].photos.push(photo);
+//       }
+
+//       return acc;
+//     }, {});
+
+//     res.setHeader("x-total-count", totalCount[0].count);
+//     res.json({
+//       products: Object.values(products),
+//       totalCount: totalCount[0].count,
+//       page,
+//       limit,
+//     });
+//   } catch (err) {
+//     console.error("Error fetching products:", err);
+//     res.status(500).json({ error: "Failed to fetch products" });
+//   }
+// });
 router.get("/", async (req, res) => {
   let {
     _page = 1,
@@ -161,6 +276,7 @@ router.get("/", async (req, res) => {
     type_id,
     color_id,
   } = req.query;
+
   const page = parseInt(_page, 10) || 1;
   const limit = parseInt(_limit, 10) || 5;
   const offset = (page - 1) * limit;
@@ -194,17 +310,17 @@ router.get("/", async (req, res) => {
 
   try {
     const results = await executeQuery(
-      `SELECT p.product_id, p.product_name, p.type_id, p.color_id, p.size,p.category_id, p.mo_number, pr.price, ph.photo
-   FROM (
-     SELECT DISTINCT p.id AS product_id, p.product_name, p.type_id, p.color_id,p.category_id,  p.size, p.mo_number
-     FROM product p
-     LEFT JOIN price pr ON p.id = pr.product_id
-     ${whereClause}
-     ORDER BY p.id DESC
-     LIMIT ? OFFSET ?
-   ) AS p
-   LEFT JOIN photo ph ON p.product_id = ph.product_id
-   LEFT JOIN price pr ON p.product_id = pr.product_id`,
+      `SELECT p.product_id, p.product_name, p.type_id, p.color_id, p.size, p.category_id, p.mo_number, pr.price, ph.photo
+       FROM (
+         SELECT DISTINCT p.id AS product_id, p.product_name, p.type_id, p.color_id, p.category_id, p.size, p.mo_number
+         FROM product p
+         LEFT JOIN price pr ON p.id = pr.product_id
+         ${whereClause}
+         ORDER BY p.created_at DESC
+         LIMIT ? OFFSET ?
+       ) AS p
+       LEFT JOIN photo ph ON p.product_id = ph.product_id
+       LEFT JOIN price pr ON p.product_id = pr.product_id`,
       [...params, limit, offset]
     );
 
@@ -214,12 +330,6 @@ router.get("/", async (req, res) => {
        ${whereClause}`,
       [...params]
     );
-
-    if (results.length === 0) {
-      return res
-        .status(404)
-        .json({ message: "No products found matching the criteria" });
-    }
 
     const products = results.reduce((acc, row) => {
       const {
