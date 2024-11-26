@@ -6,7 +6,7 @@ const { executeQuery } = require("../config/db");
 // Fetch all colors
 router.get("/", async (req, res) => {
   try {
-    const results = await executeQuery("SELECT * FROM color");
+    const results = await executeQuery("SELECT * FROM color ORDER BY id DESC");
     res.json(results);
   } catch (err) {
     console.error("Error fetching colors:", err);
@@ -16,11 +16,12 @@ router.get("/", async (req, res) => {
 
 // Create a new color
 router.post("/", async (req, res) => {
-  const { color_name } = req.body;
+  const { color_name, color_code } = req.body;
   try {
-    await executeQuery("INSERT INTO color (color_name) VALUES (?)", [
-      color_name,
-    ]);
+    await executeQuery(
+      "INSERT INTO color (color_name , color_code) VALUES (?, ?)",
+      [color_name, color_code]
+    );
     res.status(201).json({ message: "Color created successfully" });
   } catch (err) {
     console.error("Error creating color:", err);
@@ -31,12 +32,12 @@ router.post("/", async (req, res) => {
 // Update an existing color
 router.put("/:id", async (req, res) => {
   const { id } = req.params;
-  const { color_name } = req.body;
+  const { color_name, color_code } = req.body;
   try {
-    await executeQuery("UPDATE color SET color_name = ? WHERE id = ?", [
-      color_name,
-      id,
-    ]);
+    await executeQuery(
+      "UPDATE color SET color_name = ? , color_code= ?  WHERE id = ?",
+      [color_name, color_code, id]
+    );
     res.json({ message: "Color updated successfully" });
   } catch (err) {
     console.error("Error updating color:", err);

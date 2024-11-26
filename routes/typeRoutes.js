@@ -5,7 +5,7 @@ const { executeQuery } = require("../config/db");
 // Fetch all types
 router.get("/", async (req, res) => {
   try {
-    const results = await executeQuery("SELECT * FROM type");
+    const results = await executeQuery("SELECT * FROM type  ORDER BY id DESC");
     res.json(results);
   } catch (err) {
     console.error("Error fetching types:", err);

@@ -5,7 +5,9 @@ const { executeQuery } = require("../config/db");
 // Fetch all categories
 router.get("/", async (req, res) => {
   try {
-    const results = await executeQuery("SELECT * FROM category");
+    const results = await executeQuery(
+      "SELECT * FROM category ORDER BY id DESC"
+    );
     res.json(results);
   } catch (err) {
     console.error("Error fetching categories:", err);
