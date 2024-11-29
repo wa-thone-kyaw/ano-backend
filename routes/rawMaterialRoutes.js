@@ -20,19 +20,32 @@ router.get("/", async (req, res) => {
 
 // Create a new raw material
 // rawMaterialRoutes.js
+// POST route (create new material)
 router.post("/", async (req, res) => {
-  const { material_name, localOrForeign, importDate, quantity, importer } =
-    req.body;
+  const {
+    material_name,
+    localOrForeign,
+    import_date, // Ensure the format is 'YYYY-MM-DD'
+    quantity,
+    importer,
+    unit,
+  } = req.body;
 
-  // Ensure importDate is properly formatted
-  const formattedImportDate = importDate
-    ? dayjs(importDate).format("YYYY-MM-DD")
+  const formattedImportDate = import_date
+    ? dayjs(import_date).format("YYYY-MM-DD") // Ensure correct format
     : null;
 
   try {
     await executeQuery(
-      "INSERT INTO raw_material (material_name, source, import_date, quantity, importer) VALUES (?, ?, ?, ?, ?)",
-      [material_name, localOrForeign, formattedImportDate, quantity, importer]
+      "INSERT INTO raw_material (material_name, source, import_date, quantity, importer, unit) VALUES (?, ?, ?, ?, ?, ?)",
+      [
+        material_name,
+        localOrForeign,
+        formattedImportDate,
+        quantity,
+        importer,
+        unit,
+      ]
     );
     res.status(201).json({ message: "Raw material created successfully" });
   } catch (err) {
@@ -40,6 +53,7 @@ router.post("/", async (req, res) => {
     res.status(500).json({ error: "Failed to create raw material" });
   }
 });
+
 // Fetch raw material by ID
 router.get("/:id", async (req, res) => {
   const { id } = req.params;
@@ -62,20 +76,28 @@ router.get("/:id", async (req, res) => {
 // Update raw material
 router.put("/:id", async (req, res) => {
   const { id } = req.params;
-  const { material_name, localOrForeign, import_date, quantity, importer } =
-    req.body;
+  const {
+    material_name,
+    localOrForeign,
+    import_date,
+    quantity,
+    importer,
+    unit,
+  } = req.body;
   const formattedImportDate = import_date
     ? dayjs(import_date).format("YYYY-MM-DD")
     : null;
+
   try {
     await executeQuery(
-      "UPDATE raw_material SET material_name = ?, source = ?, import_date = ?, quantity = ?, importer = ? WHERE id = ?",
+      "UPDATE raw_material SET material_name = ?, source = ?, import_date = ?, quantity = ?, importer = ?, unit = ? WHERE id = ?",
       [
         material_name,
         localOrForeign,
         formattedImportDate,
         quantity,
         importer,
+        unit,
         id,
       ]
     );
