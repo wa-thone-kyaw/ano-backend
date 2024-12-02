@@ -11,10 +11,14 @@ const upload = require("../config/multerConfig");
 router.get("/all", async (req, res) => {
   try {
     const results = await executeQuery(
-      `SELECT p.id AS product_id, p.product_name, p.type_id, p.color_id, p.size, p.mo_number,p.category_id ,p.pcs_per_box,  pr.price,pr.effective_date,  ph.photo
+      `SELECT p.id AS product_id, p.product_name, p.type_id, p.color_id, p.size, p.mo_number,p.category_id ,p.pcs_per_box,  pr.price,pr.effective_date,  ph.photo,   i.quantity,
+        i.reorder_level,
+       w.warehouse_name
        FROM product p
        LEFT JOIN photo ph ON p.id = ph.product_id
        LEFT JOIN price pr ON p.id = pr.product_id
+      LEFT JOIN inventory i ON p.id = i.product_id
+      LEFT JOIN warehouse w ON i.warehouse_id = w.id
        ORDER BY p.id DESC`
     );
 
@@ -31,6 +35,9 @@ router.get("/all", async (req, res) => {
         effective_date,
         pcs_per_box,
         photo,
+        quantity,
+        reorder_level,
+        warehouse_name,
       } = row;
 
       if (!acc[product_id]) {
@@ -41,6 +48,11 @@ router.get("/all", async (req, res) => {
           color_id,
           size,
           mo_number,
+          category_id,
+          pcs_per_box,
+          quantity,
+          reorder_level,
+          warehouse_name,
           prices: [],
 
           photos: [],
@@ -62,7 +74,7 @@ router.get("/all", async (req, res) => {
     res.status(500).json({ error: "Failed to fetch products" });
   }
 });
-//withut pagination test
+//without pagination test
 router.get("/test", async (req, res) => {
   const { product_name_like, type_id, color_id } = req.query;
 
@@ -194,18 +206,16 @@ router.get("/", async (req, res) => {
 
   try {
     const results = await executeQuery(
-      `SELECT p.product_id, p.product_name, p.type_id, p.color_id, p.size, p.category_id, p.mo_number, 
+      `SELECT p.product_id, p.product_name, p.type_id, p.color_id, p.size, p.category_id, p.mo_number, p.pcs_per_box,
          p.microwave_safe, 
          p.description, 
          p.is_active, 
          p.created_at, 
-         p.updated_at, pr.price, ph.photo
+         p.updated_at, pr.price, ph.photo,
+         i.quantity, i.reorder_level,  w.warehouse_name
        FROM (
-         SELECT DISTINCT p.id AS product_id, p.product_name, p.type_id, p.color_id, p.category_id, p.size, p.mo_number,  p.microwave_safe, 
-           p.description, 
-           p.is_active, 
-           p.created_at, 
-           p.updated_at
+         SELECT DISTINCT p.id AS product_id, p.product_name, p.type_id, p.color_id, p.category_id, p.size, p.mo_number, p.pcs_per_box,
+           p.microwave_safe, p.description, p.is_active, p.created_at, p.updated_at
          FROM product p
          LEFT JOIN price pr ON p.id = pr.product_id
          ${whereClause}
@@ -213,7 +223,10 @@ router.get("/", async (req, res) => {
          LIMIT ? OFFSET ?
        ) AS p
        LEFT JOIN photo ph ON p.product_id = ph.product_id
-       LEFT JOIN price pr ON p.product_id = pr.product_id`,
+       LEFT JOIN price pr ON p.product_id = pr.product_id
+       LEFT JOIN inventory i ON p.product_id = i.product_id
+       LEFT JOIN warehouse w ON i.warehouse_id = w.id`, // Join with the inventory table
+
       [...params, limit, offset]
     );
 
@@ -241,6 +254,9 @@ router.get("/", async (req, res) => {
         updated_at,
         price,
         photo,
+        quantity,
+        reorder_level,
+        warehouse_name,
       } = row;
 
       if (!acc[product_id]) {
@@ -260,6 +276,9 @@ router.get("/", async (req, res) => {
           updated_at,
           price,
           photos: [],
+          quantity, // Add the missing field
+          reorder_level, // Add the missing field
+          warehouse_name, // Add the missing field
         };
       }
 
@@ -291,10 +310,14 @@ router.get("/:id", async (req, res) => {
     const results = await executeQuery(
       `SELECT p.id AS product_id, p.product_name, p.type_id, p.color_id, p.size, p.mo_number, p.category_id ,p.description,p.created_at,updated_at,
           microwave_safe,
-          is_active, pr.price,p.pcs_per_box, ph.photo
+          is_active, pr.price,p.pcs_per_box, ph.photo,  i.quantity, 
+        i.reorder_level, 
+      w.warehouse_name
        FROM product p
        LEFT JOIN photo ph ON p.id = ph.product_id
        LEFT JOIN price pr ON p.id = pr.product_id
+         LEFT JOIN inventory i ON p.id = i.product_id
+          LEFT JOIN warehouse w ON i.warehouse_id = w.id
        WHERE p.id = ?`,
       [id]
     );
@@ -320,6 +343,9 @@ router.get("/:id", async (req, res) => {
         updated_at,
         microwave_safe,
         is_active,
+        quantity,
+        reorder_level,
+        warehouse_name,
       } = row;
       if (!acc) {
         acc = {
@@ -332,6 +358,9 @@ router.get("/:id", async (req, res) => {
           mo_number,
           price,
           pcs_per_box,
+          quantity,
+          reorder_level,
+          warehouse_name,
           description,
           created_at,
           updated_at,
@@ -346,6 +375,7 @@ router.get("/:id", async (req, res) => {
     }, null);
 
     res.json(product);
+    console.log("Product details being sent:", product);
   } catch (err) {
     console.error("Error fetching product details:", err);
     res.status(500).json({ error: "Failed to fetch product details" });
@@ -366,6 +396,9 @@ router.put("/:id", upload.array("photos", 4), async (req, res) => {
     microwave_safe,
     description,
     is_active,
+    quantity,
+    reorder_level,
+    warehouse_location,
   } = req.body;
   const photo_urls = req.files.map((file) => file.filename);
 
@@ -384,14 +417,23 @@ router.put("/:id", upload.array("photos", 4), async (req, res) => {
         microwave_safe,
         description,
         is_active,
+        category_id,
+
+        microwave_safe,
         id,
       ]
     );
 
     // Update the price
+    // await executeQuery(
+    //   "UPDATE price SET price = ?, effective_date = ? WHERE product_id = ?",
+    //   [price, new Date(), id]
+    // );
     await executeQuery(
-      "UPDATE price SET price = ?, effective_date = ? WHERE product_id = ?",
-      [price, new Date(), id]
+      `UPDATE inventory 
+      SET quantity = ?, reorder_level = ?, warehouse_location = ?
+      WHERE product_id = ?`,
+      [quantity, reorder_level, warehouse_location, id]
     );
 
     // Delete previous photos
@@ -461,6 +503,10 @@ router.post("/", upload.array("photos", 4), async (req, res) => {
     microwave_safe,
     description,
     is_active,
+
+    quantity, // New field for product quantity
+    reorder_level, // New field for reorder level
+    warehouse_location,
   } = req.body;
   const isMicrowaveSafe = microwave_safe === "1" || microwave_safe === 1;
   const isActive = is_active === "1" || is_active === 1;
@@ -507,6 +553,12 @@ router.post("/", upload.array("photos", 4), async (req, res) => {
           [url, productId]
         );
       })
+    );
+    // Insert product quantity into the inventory table
+    await executeQuery(
+      `INSERT INTO inventory (product_id, quantity, reorder_level, warehouse_location) 
+       VALUES (?, ?, ?, ?)`,
+      [productId, quantity, reorder_level, warehouse_location]
     );
 
     res.status(201).json({ message: "Product created successfully" });

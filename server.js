@@ -17,6 +17,7 @@ const supplierRoutes = require("./routes/supplierRoutes");
 const categoryRoutes = require("./routes/categoryRoutes");
 const priceRoutes = require("./routes/priceRoutes");
 const roleRoutes = require("./routes/roleRoutes");
+const warehouses = require("./routes/warehouseRoutes");
 const app = express();
 app.use(cors());
 app.use(express.json());
@@ -38,6 +39,7 @@ app.use("/prices", priceRoutes);
 app.use("/roles", roleRoutes);
 app.use("/permissions", roleRoutes);
 app.use("/roles-with-permissions", roleRoutes);
+app.use("/warehouses", warehouses);
 const PORT = process.env.PORT || 5001;
 app.listen(PORT, () => {
   console.log("JWT_SECRET:", process.env.JWT_SECRET);
