@@ -7,11 +7,12 @@ router.get("/", async (req, res) => {
   try {
     const orders = await executeQuery(`
       SELECT orders.id, orders.quantity, customers.name AS customer_name, 
-             product_name AS product_name, price.price AS product_price, orders.total
+             product.product_name AS product_name, prices.price AS product_price, orders.total
       FROM orders 
       JOIN customers ON orders.customer_id = customers.id 
       JOIN product ON orders.product_id = product.id
-      JOIN price ON product.id = price.product_id -- Join with price table
+      JOIN product_prices ON product.id = product_prices.product_id
+      JOIN prices ON product_prices.price_id = prices.id -- Join with prices table
     `);
     res.status(200).json(orders);
   } catch (err) {
@@ -25,10 +26,15 @@ router.post("/", async (req, res) => {
   const { customer_id, product_id, quantity } = req.body;
 
   try {
+    // Get the price for the product from the prices table
     const productPrice = await executeQuery(
-      "SELECT price FROM price WHERE product_id = ?", // Get price from price table
+      `SELECT prices.price 
+       FROM product_prices 
+       JOIN prices ON product_prices.price_id = prices.id 
+       WHERE product_prices.product_id = ?`,
       [product_id]
     );
+
     const total = productPrice[0].price * quantity;
 
     const result = await executeQuery(
@@ -51,10 +57,15 @@ router.put("/:id", async (req, res) => {
   const { customer_id, product_id, quantity } = req.body;
 
   try {
+    // Get the price for the product from the prices table
     const productPrice = await executeQuery(
-      "SELECT price FROM price WHERE product_id = ?", // Get price from price table
+      `SELECT prices.price 
+       FROM product_prices 
+       JOIN prices ON product_prices.price_id = prices.id 
+       WHERE product_prices.product_id = ?`,
       [product_id]
     );
+
     const total = productPrice[0].price * quantity;
 
     await executeQuery(

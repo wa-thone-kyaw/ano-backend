@@ -50,22 +50,22 @@ router.get("/", async (req, res) => {
   try {
     const results = await executeQuery(
       `SELECT p.product_id, 
-       p.product_name, 
-       p.type_id, 
-       p.color_id, 
-       p.size, 
-       p.category_id, 
-       p.mo_number,
-       p.microwave_safe, 
-       p.description, 
-       p.is_active, 
-       p.created_at, 
-       p.updated_at, 
-       pr.price, 
-       ph.photo,
-       i.quantity, 
-       i.reorder_level, 
-       w.warehouse_name
+    p.product_name, 
+    p.type_id, 
+    p.color_id, 
+    p.size, 
+    p.category_id, 
+    p.mo_number,
+    p.microwave_safe, 
+    p.description, 
+    p.is_active, 
+    p.created_at, 
+    p.updated_at, 
+    pr.price, 
+    ph.photo,
+    i.quantity, 
+    i.reorder_level, 
+    w.warehouse_name
 FROM (
     SELECT DISTINCT p.id AS product_id, 
                     p.product_name, 
@@ -80,17 +80,15 @@ FROM (
                     p.created_at, 
                     p.updated_at
     FROM product p
+    ${whereClause}
     ORDER BY p.created_at DESC
-    LIMIT 5 OFFSET 0
+    LIMIT ? OFFSET ?
 ) AS p
 LEFT JOIN photo ph ON p.product_id = ph.product_id
 LEFT JOIN product_prices pp ON p.product_id = pp.product_id
 LEFT JOIN prices pr ON pp.price_id = pr.id
 LEFT JOIN inventory i ON p.product_id = i.product_id
-LEFT JOIN warehouse w ON i.warehouse_id = w.id;
-
-`, // Corrected 'pr.prices' to 'pr.price'
-
+LEFT JOIN warehouse w ON i.warehouse_id = w.id;`,
       [...params, limit, offset]
     );
 
@@ -173,38 +171,43 @@ router.get("/:id", async (req, res) => {
   try {
     const results = await executeQuery(
       `SELECT 
-          p.id AS product_id, 
-          p.product_name, 
-          p.type_id, 
-          p.size, 
-          p.mo_number, 
-          p.category_id, 
-          p.description, 
-          p.created_at, 
-          p.updated_at, 
-          p.microwave_safe, 
-          p.is_active, 
-          ph.photo, 
-          i.quantity, 
-          i.reorder_level, 
-          w.warehouse_name, 
-          pr.price, 
-          pr.currency, 
-          c.id AS color_id, 
-          c.color_name, 
-          c.color_code, 
-          ppb.pcs_per_box 
-       FROM product p
-       LEFT JOIN photo ph ON p.id = ph.product_id
-       LEFT JOIN product_prices pp ON p.id = pp.product_id
-       LEFT JOIN prices pr ON pp.price_id = pr.id
-       LEFT JOIN product_colors pc ON p.id = pc.product_id
-       LEFT JOIN color c ON pc.color_id = c.id
-       LEFT JOIN product_pcs_per_box pppb ON p.id = pppb.product_id
-       LEFT JOIN pcs_per_box ppb ON pppb.pcs_per_box_id = ppb.id
-       LEFT JOIN inventory i ON p.id = i.product_id
-       LEFT JOIN warehouse w ON i.warehouse_id = w.id
-       WHERE p.id = ?`,
+    p.id AS product_id, 
+    p.product_name, 
+    p.type_id, 
+    p.size, 
+    p.mo_number, 
+    p.category_id, 
+    p.description, 
+    p.created_at, 
+    p.updated_at, 
+    p.microwave_safe, 
+    p.is_active, 
+    ph.photo, 
+    i.quantity, 
+    i.reorder_level, 
+    w.warehouse_name, 
+    pr.price, 
+    pr.currency, 
+    c.id AS color_id, 
+    c.color_name, 
+    c.color_code, 
+    ppb.pcs_per_box, 
+    t.type_name,           -- Fetch type name
+    cat.category_name      -- Fetch category name
+FROM product p
+LEFT JOIN photo ph ON p.id = ph.product_id
+LEFT JOIN product_prices pp ON p.id = pp.product_id
+LEFT JOIN prices pr ON pp.price_id = pr.id
+LEFT JOIN product_colors pc ON p.id = pc.product_id
+LEFT JOIN color c ON pc.color_id = c.id
+LEFT JOIN product_pcs_per_box pppb ON p.id = pppb.product_id
+LEFT JOIN pcs_per_box ppb ON pppb.pcs_per_box_id = ppb.id
+LEFT JOIN inventory i ON p.id = i.product_id
+LEFT JOIN warehouse w ON i.warehouse_id = w.id
+LEFT JOIN type t ON p.type_id = t.id          -- Join type table
+LEFT JOIN category cat ON p.category_id = cat.id  -- Join category table
+WHERE p.id = ?
+`,
       [id]
     );
 
@@ -337,7 +340,7 @@ router.put("/:id", upload.array("photos", 4), async (req, res) => {
       [
         product_name,
         type_id,
-        validColorId, // Use the valid color_id (either null or the actual ID)
+        validColorId,
         size,
         mo_number,
         category_id,
@@ -376,36 +379,61 @@ router.put("/:id", upload.array("photos", 4), async (req, res) => {
   }
 });
 
-// Delete product
 router.delete("/:id", async (req, res) => {
   const { id } = req.params;
 
   try {
+    // Fetch all related photos for the product
     const photoResults = await executeQuery(
-      `SELECT ph.id, ph.photo 
+      `SELECT ph.photo 
        FROM photo ph 
        WHERE ph.product_id = ?`,
       [id]
     );
 
+    // Delete photos from filesystem
     photoResults.forEach(({ photo }) => {
       const photoPath = path.join(__dirname, "uploads", photo);
       if (fs.existsSync(photoPath)) {
-        fs.unlinkSync(photoPath);
+        fs.unlinkSync(photoPath); // Remove the photo from the filesystem
       }
     });
 
+    // Delete the entries in the product_prices table first
+    await executeQuery("DELETE FROM product_prices WHERE product_id = ?", [id]);
+
+    // Now delete related records from other tables
     await executeQuery("DELETE FROM photo WHERE product_id = ?", [id]);
-    await executeQuery("DELETE FROM price WHERE product_id = ?", [id]);
+    await executeQuery("DELETE FROM product_pcs_per_box WHERE product_id = ?", [
+      id,
+    ]);
+    await executeQuery("DELETE FROM product_colors WHERE product_id = ?", [id]);
+
+    // Finally, delete the prices from the prices table by using price_id from product_prices
+    const priceIds = await executeQuery(
+      `SELECT price_id FROM product_prices WHERE product_id = ?`,
+      [id]
+    );
+
+    if (priceIds.length > 0) {
+      const priceIdList = priceIds.map((p) => p.price_id);
+      await executeQuery(`DELETE FROM prices WHERE id IN (?)`, [priceIdList]);
+    }
+
+    // Delete the product itself
     await executeQuery("DELETE FROM product WHERE id = ?", [id]);
 
-    res.status(200).json({ message: "Product deleted successfully" });
+    // Send successful response
+    res.status(200).json({
+      message: "Product and its associated data deleted successfully",
+    });
   } catch (err) {
     console.error("Error deleting product:", err);
-    res.status(500).json({ error: "Failed to delete product" });
+    res
+      .status(500)
+      .json({ error: "Failed to delete product", details: err.message });
   }
 });
-
 // Create product
 router.post("/", upload.array("photos", 4), async (req, res) => {
   const {
