@@ -7,57 +7,6 @@ const router = express.Router();
 const { executeQuery } = require("../config/db");
 const upload = require("../config/multerConfig");
 
-// Get all products without pagination
-router.get("/all", async (req, res) => {
-  try {
-    const results = await executeQuery(
-      `SELECT p.id AS product_id, p.product_name, p.type_id, p.color_id, p.size, p.mo_number, pr.price, ph.photo
-       FROM product p
-       LEFT JOIN photo ph ON p.id = ph.product_id
-       LEFT JOIN price pr ON p.id = pr.product_id
-       ORDER BY p.id DESC`
-    );
-
-    const products = results.reduce((acc, row) => {
-      const {
-        product_id,
-        product_name,
-        type_id,
-        color_id,
-        size,
-        mo_number,
-        price,
-        photo,
-      } = row;
-
-      if (!acc[product_id]) {
-        acc[product_id] = {
-          id: product_id,
-          product_name,
-          type_id,
-          color_id,
-          size,
-          mo_number,
-          price,
-          photos: [],
-        };
-      }
-
-      if (photo) {
-        acc[product_id].photos.push(photo);
-      }
-
-      return acc;
-    }, {});
-
-    res.json(Object.values(products));
-  } catch (err) {
-    console.error("Error fetching all products:", err);
-    res.status(500).json({ error: "Failed to fetch products" });
-  }
-});
-
-// Get products with pagination
 router.get("/", async (req, res) => {
   let {
     _page = 1,
@@ -66,6 +15,7 @@ router.get("/", async (req, res) => {
     type_id,
     color_id,
   } = req.query;
+
   const page = parseInt(_page, 10) || 1;
   const limit = parseInt(_limit, 10) || 5;
   const offset = (page - 1) * limit;
@@ -99,17 +49,27 @@ router.get("/", async (req, res) => {
 
   try {
     const results = await executeQuery(
-      `SELECT p.product_id, p.product_name, p.type_id, p.color_id, p.size, p.mo_number, pr.price, ph.photo
-   FROM (
-     SELECT DISTINCT p.id AS product_id, p.product_name, p.type_id, p.color_id, p.size, p.mo_number
-     FROM product p
-     LEFT JOIN price pr ON p.id = pr.product_id
-     ${whereClause}
-     ORDER BY p.id DESC
-     LIMIT ? OFFSET ?
-   ) AS p
-   LEFT JOIN photo ph ON p.product_id = ph.product_id
-   LEFT JOIN price pr ON p.product_id = pr.product_id`,
+      `SELECT p.product_id, p.product_name, p.type_id, p.color_id, p.size, p.category_id, p.mo_number,
+         p.microwave_safe, 
+         p.description, 
+         p.is_active, 
+         p.created_at, 
+         p.updated_at, pr.price, ph.photo,
+         i.quantity, i.reorder_level,  w.warehouse_name
+       FROM (
+         SELECT DISTINCT p.id AS product_id, p.product_name, p.type_id, p.color_id, p.category_id, p.size, p.mo_number,
+           p.microwave_safe, p.description, p.is_active, p.created_at, p.updated_at
+         FROM product p
+         LEFT JOIN price pr ON p.id = pr.product_id
+         ${whereClause}
+         ORDER BY p.created_at DESC
+         LIMIT ? OFFSET ?
+       ) AS p
+       LEFT JOIN photo ph ON p.product_id = ph.product_id
+       LEFT JOIN price pr ON p.product_id = pr.product_id
+       LEFT JOIN inventory i ON p.product_id = i.product_id
+       LEFT JOIN warehouse w ON i.warehouse_id = w.id`, // Join with the inventory table
+
       [...params, limit, offset]
     );
 
@@ -120,22 +80,26 @@ router.get("/", async (req, res) => {
       [...params]
     );
 
-    if (results.length === 0) {
-      return res
-        .status(404)
-        .json({ message: "No products found matching the criteria" });
-    }
-
     const products = results.reduce((acc, row) => {
       const {
         product_id,
         product_name,
         type_id,
         color_id,
+        category_id,
         size,
         mo_number,
+
+        microwave_safe,
+        description,
+        is_active,
+        created_at,
+        updated_at,
         price,
         photo,
+        quantity,
+        reorder_level,
+        warehouse_name,
       } = row;
 
       if (!acc[product_id]) {
@@ -144,10 +108,20 @@ router.get("/", async (req, res) => {
           product_name,
           type_id,
           color_id,
+          category_id,
           size,
           mo_number,
+
+          microwave_safe,
+          description,
+          is_active,
+          created_at,
+          updated_at,
           price,
           photos: [],
+          quantity, // Add the missing field
+          reorder_level, // Add the missing field
+          warehouse_name, // Add the missing field
         };
       }
 
@@ -177,10 +151,16 @@ router.get("/:id", async (req, res) => {
 
   try {
     const results = await executeQuery(
-      `SELECT p.id AS product_id, p.product_name, p.type_id, p.color_id, p.size, p.mo_number, pr.price, ph.photo
+      `SELECT p.id AS product_id, p.product_name, p.type_id, p.color_id, p.size, p.mo_number, p.category_id ,p.description,p.created_at,updated_at,
+          microwave_safe,
+          is_active, pr.price, ph.photo,  i.quantity, 
+        i.reorder_level, 
+      w.warehouse_name
        FROM product p
        LEFT JOIN photo ph ON p.id = ph.product_id
        LEFT JOIN price pr ON p.id = pr.product_id
+         LEFT JOIN inventory i ON p.id = i.product_id
+          LEFT JOIN warehouse w ON i.warehouse_id = w.id
        WHERE p.id = ?`,
       [id]
     );
@@ -195,10 +175,20 @@ router.get("/:id", async (req, res) => {
         product_name,
         type_id,
         color_id,
+        category_id,
         size,
         mo_number,
         price,
         photo,
+
+        description,
+        created_at,
+        updated_at,
+        microwave_safe,
+        is_active,
+        quantity,
+        reorder_level,
+        warehouse_name,
       } = row;
       if (!acc) {
         acc = {
@@ -206,9 +196,20 @@ router.get("/:id", async (req, res) => {
           product_name,
           type_id,
           color_id,
+          category_id,
           size,
           mo_number,
           price,
+
+          quantity,
+          reorder_level,
+          warehouse_name,
+          description,
+          created_at,
+          updated_at,
+          microwave_safe,
+          is_active,
+
           photos: [],
         };
       }
@@ -217,27 +218,64 @@ router.get("/:id", async (req, res) => {
     }, null);
 
     res.json(product);
+    console.log("Product details being sent:", product);
   } catch (err) {
     console.error("Error fetching product details:", err);
     res.status(500).json({ error: "Failed to fetch product details" });
   }
 });
 
-router.put("/:id", upload.array("photos", 5), async (req, res) => {
+router.put("/:id", upload.array("photos", 4), async (req, res) => {
   const { id } = req.params;
-  const { product_name, type_id, color_id, size, mo_number, price } = req.body;
+  const {
+    product_name,
+    type_id,
+    color_id,
+    size,
+    mo_number,
+    price,
+    category_id,
+
+    microwave_safe,
+    description,
+    is_active,
+    quantity,
+    reorder_level,
+    warehouse_location,
+  } = req.body;
   const photo_urls = req.files.map((file) => file.filename);
 
   try {
     await executeQuery(
-      "UPDATE product SET product_name = ?, type_id = ?, color_id = ?, size = ?, mo_number = ? WHERE id = ?",
-      [product_name, type_id, color_id, size, mo_number, id]
+      "UPDATE product SET product_name = ?, type_id = ?, color_id = ?, size = ?, mo_number = ?, category_id = ?, microwave_safe = ?, description = ?, is_active = ?, updated_at = NOW() WHERE id = ?",
+      [
+        product_name,
+        type_id,
+        color_id,
+        size,
+        mo_number,
+        category_id,
+
+        microwave_safe,
+        description,
+        is_active,
+        category_id,
+
+        microwave_safe,
+        id,
+      ]
     );
 
     // Update the price
+    // await executeQuery(
+    //   "UPDATE price SET price = ?, effective_date = ? WHERE product_id = ?",
+    //   [price, new Date(), id]
+    // );
     await executeQuery(
-      "UPDATE price SET price = ?, effective_date = ? WHERE product_id = ?",
-      [price, new Date(), id]
+      `UPDATE inventory 
+      SET quantity = ?, reorder_level = ?, warehouse_location = ?
+      WHERE product_id = ?`,
+      [quantity, reorder_level, warehouse_location, id]
     );
 
     // Delete previous photos
@@ -294,17 +332,53 @@ router.delete("/:id", async (req, res) => {
 });
 
 // Create product
-// Create product
 router.post("/", upload.array("photos", 4), async (req, res) => {
-  const { product_name, type_id, color_id, size, mo_number, price } = req.body;
+  const {
+    product_name,
+    type_id,
+    color_id,
+    size,
+    mo_number,
+    price,
+    category_id,
+
+    microwave_safe,
+    description,
+    is_active,
+
+    quantity, // New field for product quantity
+    reorder_level, // New field for reorder level
+    //warehouse_location,
+  } = req.body;
+  const isMicrowaveSafe = microwave_safe === "1" || microwave_safe === 1;
+  const isActive = is_active === "1" || is_active === 1;
   const photo_urls = req.files.map((file) => file.filename);
+  const categoryCheck = await executeQuery(
+    "SELECT COUNT(*) as count FROM category WHERE id = ?",
+    [category_id]
+  );
+
+  if (categoryCheck[0].count === 0) {
+    return res.status(400).json({ error: "Invalid category_id" });
+  }
 
   try {
     // Insert product details into the product table
     const result = await executeQuery(
-      "INSERT INTO product (product_name, type_id, color_id, size, mo_number) VALUES (?, ?, ?, ?, ?)",
-      [product_name, type_id, color_id, size, mo_number]
+      "INSERT INTO product (product_name, type_id, color_id, size, mo_number, category_id, microwave_safe, description, is_active, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())",
+      [
+        product_name,
+        type_id,
+        color_id,
+        size,
+        mo_number,
+        category_id,
+        isMicrowaveSafe, // Corrected to pass a boolean-like value
+        description,
+        isActive, // Corrected to pass a boolean-like value
+      ]
     );
+
     const productId = result.insertId;
 
     // Insert price into the price table
@@ -321,6 +395,12 @@ router.post("/", upload.array("photos", 4), async (req, res) => {
           [url, productId]
         );
       })
+    );
+    // Insert product quantity into the inventory table
+    await executeQuery(
+      `INSERT INTO inventory (product_id, quantity, reorder_level) 
+       VALUES (?, ?, ?)`,
+      [productId, quantity, reorder_level]
     );
 
     res.status(201).json({ message: "Product created successfully" });
