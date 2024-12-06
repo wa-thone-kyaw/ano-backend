@@ -144,10 +144,13 @@ LEFT JOIN warehouse w ON i.warehouse_id = w.id;`,
         };
       }
 
-      if (photo) {
+      /* if (photo) {
+        acc[product_id].photos.push(photo);
+      } */
+      // Avoid duplicate photos
+      if (photo && !acc[product_id].photos.includes(photo)) {
         acc[product_id].photos.push(photo);
       }
-
       return acc;
     }, {});
 
@@ -171,43 +174,44 @@ router.get("/:id", async (req, res) => {
   try {
     const results = await executeQuery(
       `SELECT 
-    p.id AS product_id, 
-    p.product_name, 
-    p.type_id, 
-    p.size, 
-    p.mo_number, 
-    p.category_id, 
-    p.description, 
-    p.created_at, 
-    p.updated_at, 
-    p.microwave_safe, 
-    p.is_active, 
-    ph.photo, 
-    i.quantity, 
-    i.reorder_level, 
-    w.warehouse_name, 
-    pr.price, 
-    pr.currency, 
-    c.id AS color_id, 
-    c.color_name, 
-    c.color_code, 
-    ppb.pcs_per_box, 
-    t.type_name,           -- Fetch type name
-    cat.category_name      -- Fetch category name
-FROM product p
-LEFT JOIN photo ph ON p.id = ph.product_id
-LEFT JOIN product_prices pp ON p.id = pp.product_id
-LEFT JOIN prices pr ON pp.price_id = pr.id
-LEFT JOIN product_colors pc ON p.id = pc.product_id
-LEFT JOIN color c ON pc.color_id = c.id
-LEFT JOIN product_pcs_per_box pppb ON p.id = pppb.product_id
-LEFT JOIN pcs_per_box ppb ON pppb.pcs_per_box_id = ppb.id
-LEFT JOIN inventory i ON p.id = i.product_id
-LEFT JOIN warehouse w ON i.warehouse_id = w.id
-LEFT JOIN type t ON p.type_id = t.id          -- Join type table
-LEFT JOIN category cat ON p.category_id = cat.id  -- Join category table
-WHERE p.id = ?
-`,
+        p.id AS product_id, 
+        p.product_name, 
+        p.type_id, 
+        p.size, 
+        p.mo_number, 
+        p.category_id, 
+        p.description, 
+        p.created_at, 
+        p.updated_at, 
+        p.microwave_safe, 
+        p.is_active, 
+        ph.photo, 
+        i.quantity, 
+        i.reorder_level, 
+        w.warehouse_name, 
+        w.warehouse_location, 
+        pr.price, 
+        pr.currency, 
+        c.id AS color_id, 
+        c.color_name, 
+        c.color_code, 
+        ppb.pcs_per_box, 
+        t.type_name,           
+        cat.category_name      
+      FROM product p
+      LEFT JOIN photo ph ON p.id = ph.product_id
+      LEFT JOIN product_prices pp ON p.id = pp.product_id
+      LEFT JOIN prices pr ON pp.price_id = pr.id
+      LEFT JOIN product_colors pc ON p.id = pc.product_id
+      LEFT JOIN color c ON pc.color_id = c.id
+      LEFT JOIN product_pcs_per_box pppb ON p.id = pppb.product_id
+      LEFT JOIN pcs_per_box ppb ON pppb.pcs_per_box_id = ppb.id
+      LEFT JOIN inventory i ON p.id = i.product_id
+      LEFT JOIN product_warehouse pw ON p.id = pw.product_id      -- Add product_warehouse join
+      LEFT JOIN warehouse w ON pw.warehouse_id = w.id               -- Join warehouse through product_warehouse
+      LEFT JOIN type t ON p.type_id = t.id          
+      LEFT JOIN category cat ON p.category_id = cat.id  
+      WHERE p.id = ?`,
       [id]
     );
 
@@ -215,7 +219,6 @@ WHERE p.id = ?
       return res.status(404).json({ error: "Product not found" });
     }
 
-    // Transform the results into a structured object
     const product = results.reduce((acc, row) => {
       const {
         product_id,
@@ -233,6 +236,7 @@ WHERE p.id = ?
         quantity,
         reorder_level,
         warehouse_name,
+        warehouse_location,
         price,
         currency,
         color_id,
@@ -241,7 +245,6 @@ WHERE p.id = ?
         pcs_per_box,
       } = row;
 
-      // Initialize the product object if it doesn't exist
       if (!acc) {
         acc = {
           id: product_id,
@@ -257,7 +260,7 @@ WHERE p.id = ?
           is_active: Boolean(is_active),
           quantity,
           reorder_level,
-          warehouse_name,
+          warehouses: [], // Initialize warehouses as an empty array
           photos: [],
           prices: [],
           colors: [],
@@ -265,10 +268,10 @@ WHERE p.id = ?
         };
       }
 
-      // Add photo if it exists
+      // Collect photo data
       if (photo && !acc.photos.includes(photo)) acc.photos.push(photo);
 
-      // Add price if it exists and is unique
+      // Collect price data
       if (price && currency) {
         const priceEntry = { price, currency };
         if (
@@ -278,7 +281,23 @@ WHERE p.id = ?
         }
       }
 
-      // Add color if it exists and is unique
+      // Collect warehouse data
+      if (warehouse_name && warehouse_location) {
+        const warehouseEntry = {
+          name: warehouse_name,
+          location: warehouse_location,
+        };
+        if (
+          !acc.warehouses.some(
+            (w) =>
+              w.name === warehouse_name && w.location === warehouse_location
+          )
+        ) {
+          acc.warehouses.push(warehouseEntry);
+        }
+      }
+
+      // Collect color data
       if (color_id && color_name) {
         const colorEntry = { id: color_id, name: color_name, code: color_code };
         if (!acc.colors.some((c) => c.id === color_id)) {
@@ -286,7 +305,7 @@ WHERE p.id = ?
         }
       }
 
-      // Add pcs_per_box if it exists and is unique
+      // Collect pcs_per_box data
       if (pcs_per_box && !acc.pcs_per_box.includes(pcs_per_box)) {
         acc.pcs_per_box.push(pcs_per_box);
       }
@@ -574,6 +593,135 @@ router.put("/:id/attributes", async (req, res) => {
     res
       .status(500)
       .json({ error: "Failed to update attributes", details: err.message });
+  }
+});
+
+///no pagination
+router.get("/products/all", async (req, res) => {
+  let { product_name_like, type_id, color_id } = req.query;
+
+  let whereClauses = [];
+  let params = [];
+
+  if (product_name_like) {
+    whereClauses.push("p.product_name LIKE ?");
+    params.push(`%${product_name_like}%`);
+  }
+
+  if (type_id) {
+    whereClauses.push("p.type_id = ?");
+    params.push(type_id);
+  }
+
+  if (color_id) {
+    whereClauses.push("p.color_id = ?");
+    params.push(color_id);
+  }
+
+  const whereClause =
+    whereClauses.length > 0 ? `WHERE ${whereClauses.join(" AND ")}` : "";
+
+  try {
+    const results = await executeQuery(
+      `SELECT p.product_id, 
+              p.product_name, 
+              p.type_id, 
+              p.color_id, 
+              p.size, 
+              p.category_id, 
+              p.mo_number,
+              p.microwave_safe, 
+              p.description, 
+              p.is_active, 
+              p.created_at, 
+              p.updated_at, 
+              pr.price, 
+              ph.photo,
+              i.quantity, 
+              i.reorder_level, 
+              w.warehouse_name
+       FROM (
+           SELECT DISTINCT p.id AS product_id, 
+                          p.product_name, 
+                          p.type_id, 
+                          p.color_id, 
+                          p.category_id, 
+                          p.size, 
+                          p.mo_number,
+                          p.microwave_safe, 
+                          p.description, 
+                          p.is_active, 
+                          p.created_at, 
+                          p.updated_at
+           FROM product p
+           ${whereClause}
+           ORDER BY p.created_at DESC
+       ) AS p
+       LEFT JOIN photo ph ON p.product_id = ph.product_id
+       LEFT JOIN product_prices pp ON p.product_id = pp.product_id
+       LEFT JOIN prices pr ON pp.price_id = pr.id
+       LEFT JOIN inventory i ON p.product_id = i.product_id
+       LEFT JOIN warehouse w ON i.warehouse_id = w.id;`,
+      params
+    );
+
+    const products = results.reduce((acc, row) => {
+      const {
+        product_id,
+        product_name,
+        type_id,
+        color_id,
+        category_id,
+        size,
+        mo_number,
+        microwave_safe,
+        description,
+        is_active,
+        created_at,
+        updated_at,
+        price,
+        photo,
+        quantity,
+        reorder_level,
+        warehouse_name,
+      } = row;
+
+      if (!acc[product_id]) {
+        acc[product_id] = {
+          id: product_id,
+          product_name,
+          type_id,
+          color_id,
+          category_id,
+          size,
+          mo_number,
+          microwave_safe,
+          description,
+          is_active,
+          created_at,
+          updated_at,
+          price,
+          photos: [],
+          quantity,
+          reorder_level,
+          warehouse_name,
+        };
+      }
+
+      // Avoid duplicate photos
+      if (photo && !acc[product_id].photos.includes(photo)) {
+        acc[product_id].photos.push(photo);
+      }
+
+      return acc;
+    }, {});
+
+    res.json({
+      products: Object.values(products),
+    });
+  } catch (err) {
+    console.error("Error fetching products:", err);
+    res.status(500).json({ error: "Failed to fetch products" });
   }
 });
 
