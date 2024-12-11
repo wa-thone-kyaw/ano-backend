@@ -185,4 +185,53 @@ router.delete("/attributes/remove", async (req, res) => {
     res.status(500).json({ error: "Failed to remove attribute" });
   }
 });
+//for stock management
+// router.post("/products/:productId/stock", async (req, res) => {
+//   const { productId } = req.params;
+//   const { stock } = req.body;
+
+//   // Input validation
+//   if (!productId || stock === undefined || stock < 0) {
+//     return res.status(400).json({ error: "Invalid product ID or stock value" });
+//   }
+
+//   try {
+//     // Check if product exists in the inventory
+//     const [existingStock] = await executeQuery(
+//       `SELECT quantity FROM inventory WHERE product_id = ? LIMIT 1`,
+//       [productId]
+//     );
+
+//     // If product exists, update the quantity by adding the new stock
+//     if (existingStock) {
+//       const result = await executeQuery(
+//         `UPDATE inventory SET quantity = quantity + ? WHERE product_id = ?`,
+//         [stock, productId]
+//       );
+
+//       res.status(200).json({
+//         message: "Stock updated successfully!",
+//         affectedRows: result.affectedRows,
+//       });
+//     } else {
+//       // If product doesn't exist, insert a new record with the stock quantity
+//       const result = await executeQuery(
+//         `INSERT INTO inventory (product_id, quantity, warehouse_id)
+//          VALUES (?, ?, 1)`,
+//         [productId, stock]
+//       );
+
+//       res.status(200).json({
+//         message: "Stock added successfully!",
+//         affectedRows: result.affectedRows,
+//       });
+//     }
+//   } catch (err) {
+//     console.error("Error updating stock:", err);
+//     res
+//       .status(500)
+//       .json({ error: "Failed to update stock", details: err.message });
+//   }
+// });
+
 module.exports = router;
