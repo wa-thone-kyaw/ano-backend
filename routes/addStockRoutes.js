@@ -178,6 +178,40 @@ router.delete("/stock-log/:logId", async (req, res) => {
 
 // Route to fetch stock details for a specific product
 // Route to fetch stock details for a specific product
+// router.get("/stock-details/:productId", async (req, res) => {
+//   const { productId } = req.params;
+
+//   try {
+//     // Fetch stock logs and calculate the remaining stock
+//     const stockDetails = await executeQuery(
+//       `SELECT s.id, s.added_stock, s.date_time,
+//               (SELECT SUM(added_stock)
+//                FROM stock_logs
+//                WHERE product_id = ? AND date_time <= s.date_time) AS remaining_stock
+//        FROM stock_logs s
+//        WHERE s.product_id = ?
+//        ORDER BY s.date_time DESC`,
+//       [productId, productId]
+//     );
+
+//     // Calculate the total quantity available
+//     const totalStock = await executeQuery(
+//       `SELECT SUM(added_stock) AS total_stock
+//        FROM stock_logs
+//        WHERE product_id = ?`,
+//       [productId]
+//     );
+
+//     res.status(200).json({
+//       stockDetails,
+//       totalStock: totalStock[0]?.total_stock || 0,
+//     });
+//   } catch (err) {
+//     console.error("Error fetching stock details:", err);
+//     res.status(500).json({ error: "Failed to fetch stock details" });
+//   }
+// });
+// Route to fetch stock details for a specific product
 router.get("/stock-details/:productId", async (req, res) => {
   const { productId } = req.params;
 
@@ -194,7 +228,15 @@ router.get("/stock-details/:productId", async (req, res) => {
       [productId, productId]
     );
 
-    // Calculate the total quantity available
+    // Calculate the total quantity available in inventory
+    const inventoryData = await executeQuery(
+      `SELECT quantity 
+       FROM inventory 
+       WHERE product_id = ? 
+       LIMIT 1`,
+      [productId]
+    );
+
     const totalStock = await executeQuery(
       `SELECT SUM(added_stock) AS total_stock 
        FROM stock_logs 
@@ -202,9 +244,19 @@ router.get("/stock-details/:productId", async (req, res) => {
       [productId]
     );
 
+    // Fetch product name
+    const product = await executeQuery(
+      `SELECT product_name 
+       FROM product 
+       WHERE id = ?`,
+      [productId]
+    );
+
     res.status(200).json({
+      productName: product[0]?.product_name || "Unknown Product",
       stockDetails,
       totalStock: totalStock[0]?.total_stock || 0,
+      remainingStock: inventoryData[0]?.quantity || 0, // Add remaining stock from inventory
     });
   } catch (err) {
     console.error("Error fetching stock details:", err);
