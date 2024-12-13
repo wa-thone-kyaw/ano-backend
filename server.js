@@ -21,6 +21,7 @@ const warehouses = require("./routes/warehouseRoutes");
 const attributesRoutes = require("./routes/attributesRoutes");
 const pcsRoutes = require("./routes/pcsRoutes");
 const addStockRoutes = require("./routes/addStockRoutes");
+const rawMaterialUsageRoute = require("./routes/rawMaterialUsageRoute");
 const app = express();
 app.use(cors());
 app.use(express.json());
@@ -46,6 +47,7 @@ app.use("/warehouses", warehouses);
 app.use("/attributes", attributesRoutes);
 app.use("/pcs-per-box", pcsRoutes);
 app.use("/addStock", addStockRoutes);
+app.use("/raw-material-usage", rawMaterialUsageRoute);
 const PORT = process.env.PORT || 5001;
 app.listen(PORT, () => {
   console.log("JWT_SECRET:", process.env.JWT_SECRET);

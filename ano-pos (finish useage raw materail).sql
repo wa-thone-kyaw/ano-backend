@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Dec 11, 2024 at 09:30 AM
+-- Generation Time: Dec 13, 2024 at 08:48 AM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -157,8 +157,9 @@ CREATE TABLE `inventory` (
 --
 
 INSERT INTO `inventory` (`id`, `product_id`, `quantity`, `reorder_level`, `warehouse_id`) VALUES
-(19, 50528, 3700, 0, 1),
-(20, 63, 0, 0, 1);
+(19, 50528, 101698, 0, 1),
+(20, 63, 0, 0, 1),
+(21, 50529, 0, 100, 0);
 
 -- --------------------------------------------------------
 
@@ -173,15 +174,21 @@ CREATE TABLE `orders` (
   `quantity` int(11) DEFAULT NULL,
   `total` decimal(10,2) DEFAULT NULL,
   `delivery_address` varchar(255) DEFAULT NULL,
-  `note` text DEFAULT NULL
+  `note` text DEFAULT NULL,
+  `order_date` datetime DEFAULT current_timestamp(),
+  `status` enum('Pending','Complete') DEFAULT 'Pending'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Dumping data for table `orders`
 --
 
-INSERT INTO `orders` (`id`, `customer_id`, `product_id`, `quantity`, `total`, `delivery_address`, `note`) VALUES
-(36, 9, 50528, 100000, 0.00, 'yangon', 'note');
+INSERT INTO `orders` (`id`, `customer_id`, `product_id`, `quantity`, `total`, `delivery_address`, `note`, `order_date`, `status`) VALUES
+(36, 9, 50528, 100000, 0.00, 'yangon', 'note', '2024-12-12 12:45:42', 'Pending'),
+(37, 7, 50528, 1000, 0.00, 'Yangon', NULL, '2024-12-12 12:45:42', 'Complete'),
+(39, 7, 50528, 1, 0.00, 'tes', 'g', '2024-12-12 13:09:21', 'Complete'),
+(40, 7, 50528, 1, 0.00, 'yfn', 'hi', '2024-12-12 15:18:16', 'Pending'),
+(42, 13, 50528, 1000, 0.00, 'ygn', 'hi', '2024-12-12 17:20:15', 'Pending');
 
 -- --------------------------------------------------------
 
@@ -245,7 +252,10 @@ INSERT INTO `photo` (`id`, `photo`, `product_id`) VALUES
 (349, '1733367995790.jpg', 50527),
 (350, '1733367995791.jpg', 50527),
 (351, '1733480788455.jpg', 50528),
-(352, '1733480788456.jpg', 50528);
+(352, '1733480788456.jpg', 50528),
+(353, '1734073118024.jpg', 50529),
+(354, '1734073118025.jpg', 50529),
+(355, '1734073118025.jpg', 50529);
 
 -- --------------------------------------------------------
 
@@ -350,7 +360,8 @@ INSERT INTO `prices` (`id`, `price`, `currency`, `effective_date`) VALUES
 (83, 0.00, 'USD', '2024-12-06'),
 (84, 100.00, 'MMK', '2024-12-06'),
 (85, 1.00, 'USD', '2024-12-06'),
-(86, 0.00, 'MMK', '2024-12-06');
+(86, 0.00, 'MMK', '2024-12-06'),
+(87, 0.00, 'USD', '2024-12-13');
 
 -- --------------------------------------------------------
 
@@ -765,7 +776,8 @@ INSERT INTO `product` (`id`, `product_name`, `type_id`, `color_id`, `size`, `mo_
 (475, '3 ကန', 4, 7, '3', '3', 3, '2024-11-21 04:28:39', 0, NULL, '2024-11-27 01:52:14', 1),
 (476, '33', 3, 3, '12', '12233', 3, '2024-11-21 04:28:39', 0, NULL, '2024-11-27 01:52:14', 1),
 (50527, 'Lunch Boxx', 4, NULL, '1000', '2000', 3, '2024-12-05 03:06:35', NULL, NULL, '2024-12-06 05:13:26', NULL),
-(50528, 'Ma Ma Cup', 3, NULL, '100', '199', 3, '2024-12-06 10:26:28', 0, 'hi, this is a test for mama cup', '2024-12-06 10:26:28', 1);
+(50528, 'Ma Ma Cup', 3, NULL, '100', '199', 3, '2024-12-06 10:26:28', 0, 'hi, this is a test for mama cup', '2024-12-06 10:26:28', 1),
+(50529, 'test responsive', 4, NULL, '100', '100', 3, '2024-12-13 06:58:38', 0, 'hi', '2024-12-13 06:58:38', 1);
 
 -- --------------------------------------------------------
 
@@ -836,7 +848,8 @@ INSERT INTO `product_prices` (`product_id`, `price_id`) VALUES
 (50528, 83),
 (50528, 84),
 (50528, 85),
-(50528, 86);
+(50528, 86),
+(50529, 87);
 
 -- --------------------------------------------------------
 
@@ -880,10 +893,34 @@ CREATE TABLE `raw_material` (
 --
 
 INSERT INTO `raw_material` (`id`, `material_name`, `source`, `import_date`, `quantity`, `importer`, `unit`) VALUES
-(28, 'Plywood Sheets', 'foreign', '2024-11-08', 1000, 'Yangon Import Services', 'kg'),
+(28, 'Plywood Sheets', 'foreign', '2024-11-08', 900, 'Yangon Import Services', 'kg'),
 (29, 'Nylon Thread', 'foreign', '2024-11-15', 500, 'Global Supplies Inc.', 'lbs'),
-(30, 'PVC Pipes', 'local', '2024-11-14', 60000, 'ဒေါက်တာမြနွယ်ကုမ္ပဏီ', 'ton'),
-(31, 'စက္ကူအိတ်များ', 'local', '2024-08-05', 67000, 'Diamond Star Co., Ltd.', 'viss');
+(30, 'PVC Pipes', 'local', '2024-11-14', 59900, 'ဒေါက်တာမြနွယ်ကုမ္ပဏီ', 'ton'),
+(31, 'စက္ကူအိတ်များ', 'local', '2024-08-05', 66000, 'Diamond Star Co., Ltd.', 'viss');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `raw_material_usage`
+--
+
+CREATE TABLE `raw_material_usage` (
+  `id` int(11) NOT NULL,
+  `raw_material_id` int(11) NOT NULL,
+  `used_quantity` decimal(10,2) NOT NULL,
+  `usage_date` date NOT NULL,
+  `purpose` varchar(255) DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `raw_material_usage`
+--
+
+INSERT INTO `raw_material_usage` (`id`, `raw_material_id`, `used_quantity`, `usage_date`, `purpose`) VALUES
+(1, 28, 100.00, '2024-12-12', 'for cup'),
+(2, 30, 100.00, '2024-12-12', 'fo'),
+(3, 31, 900.00, '2024-12-13', 'hi'),
+(7, 31, 100.00, '2024-12-12', 'for cup');
 
 -- --------------------------------------------------------
 
@@ -943,7 +980,8 @@ INSERT INTO `stock_logs` (`id`, `product_id`, `added_stock`, `date_time`) VALUES
 (15, 50528, 1000, '2024-12-10 12:40:32'),
 (16, 50528, 200, '2024-12-10 12:49:35'),
 (17, 50528, 500, '2024-12-10 14:17:23'),
-(18, 50528, 2000, '2024-12-10 14:34:55');
+(18, 50528, 2000, '2024-12-10 14:34:55'),
+(19, 50528, 100000, '2024-12-12 11:26:11');
 
 -- --------------------------------------------------------
 
@@ -968,12 +1006,11 @@ CREATE TABLE `suppliers` (
 --
 
 INSERT INTO `suppliers` (`id`, `name`, `address`, `contact_person`, `phone`, `email`, `source`, `join_date`, `created_at`) VALUES
-(12, 'Shwe Pyi Thar Suppliers', 'No.45, Pyay Rd, Mandalay', 'Thida Moe', '+95 9 9876543210', 'shwepyithar@example.com', 'local', '2021-11-30', NULL),
-(13, 'Golden Land Distributors', 'No.77, Sule Pagoda Rd, Yangon', NULL, '+95 905678123456', 'goldenland@example.com', 'local', NULL, NULL),
-(14, 'ဒေါက်တာမြနွယ်ကုမ္ပဏီ', 'အမှတ် (၇၄) လမ်း၊ မန္တလေး', 'မြနွယ်', '+95 9 3456789123', 'dr.myanwel@example.com', 'local', '2021-09-15', NULL),
-(15, 'ကမ္ဘာမြေထုတ်ကုန်', 'အမှတ် (၂၃၄) လမ်း၊ ရန်ကုန်', 'မြမြင့်မြတ်', '+95 9 4567891234', 'earth.products@example.com', 'local', '2022-12-25', NULL),
-(16, 'ABC Exports', '123 Orchard Rd, Singapore', 'John L', '+65 9876543210', 'abc.exports@example.com', 'foreign', '2021-06-15', NULL),
-(17, 'Yangon Import Services', '567 Main St, Beijing, China', 'Zhang Wei', '+86 12345678901', 'yangon.import@example.cn', 'foreign', '0201-07-10', NULL);
+(12, 'Shwe Pyi Thar Suppliers', 'No.45, Pyay Rd, Mandalay', NULL, '+95 9 9876543210', 'shwepyithar@example.com', 'local', NULL, NULL),
+(14, 'ဒေါက်တာမြနွယ်ကုမ္ပဏီ', 'အမှတ် (၇၄) လမ်း၊ မန္တလေး', NULL, '+95 9 3456789123', 'dr.myanwel@example.com', 'local', NULL, NULL),
+(15, 'ကမ္ဘာမြေထုတ်ကုန်', 'အမှတ် (၂၃၄) လမ်း၊ ရန်ကုန်', NULL, '+95 9 4567891234', 'earth.products@example.com', 'local', NULL, NULL),
+(16, 'ABC Exports', '123 Orchard Rd, Singapore', NULL, '+65 9876543210', 'abc.exports@example.com', 'foreign', NULL, NULL),
+(17, 'Yangon Import Services', '567 Main St, Beijing, China', NULL, '+86 12345678901', 'yangon.import@example.cn', 'foreign', NULL, NULL);
 
 -- --------------------------------------------------------
 
@@ -1156,6 +1193,13 @@ ALTER TABLE `raw_material`
   ADD PRIMARY KEY (`id`);
 
 --
+-- Indexes for table `raw_material_usage`
+--
+ALTER TABLE `raw_material_usage`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `raw_material_id` (`raw_material_id`);
+
+--
 -- Indexes for table `roles`
 --
 ALTER TABLE `roles`
@@ -1226,13 +1270,13 @@ ALTER TABLE `customers`
 -- AUTO_INCREMENT for table `inventory`
 --
 ALTER TABLE `inventory`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=21;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=22;
 
 --
 -- AUTO_INCREMENT for table `orders`
 --
 ALTER TABLE `orders`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=37;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=43;
 
 --
 -- AUTO_INCREMENT for table `pcs_per_box`
@@ -1250,25 +1294,31 @@ ALTER TABLE `permissions`
 -- AUTO_INCREMENT for table `photo`
 --
 ALTER TABLE `photo`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=353;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=356;
 
 --
 -- AUTO_INCREMENT for table `prices`
 --
 ALTER TABLE `prices`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=87;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=88;
 
 --
 -- AUTO_INCREMENT for table `product`
 --
 ALTER TABLE `product`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=50529;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=50530;
 
 --
 -- AUTO_INCREMENT for table `raw_material`
 --
 ALTER TABLE `raw_material`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=42;
+
+--
+-- AUTO_INCREMENT for table `raw_material_usage`
+--
+ALTER TABLE `raw_material_usage`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
 
 --
 -- AUTO_INCREMENT for table `roles`
@@ -1286,13 +1336,13 @@ ALTER TABLE `role_permissions`
 -- AUTO_INCREMENT for table `stock_logs`
 --
 ALTER TABLE `stock_logs`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=19;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=20;
 
 --
 -- AUTO_INCREMENT for table `suppliers`
 --
 ALTER TABLE `suppliers`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=50022;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=50023;
 
 --
 -- AUTO_INCREMENT for table `type`
@@ -1358,6 +1408,12 @@ ALTER TABLE `product_prices`
 ALTER TABLE `product_warehouse`
   ADD CONSTRAINT `product_warehouse_ibfk_1` FOREIGN KEY (`product_id`) REFERENCES `product` (`id`),
   ADD CONSTRAINT `product_warehouse_ibfk_2` FOREIGN KEY (`warehouse_id`) REFERENCES `warehouse` (`id`);
+
+--
+-- Constraints for table `raw_material_usage`
+--
+ALTER TABLE `raw_material_usage`
+  ADD CONSTRAINT `raw_material_usage_ibfk_1` FOREIGN KEY (`raw_material_id`) REFERENCES `raw_material` (`id`);
 
 --
 -- Constraints for table `role_permissions`
